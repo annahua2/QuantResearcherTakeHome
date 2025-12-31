@@ -30,9 +30,12 @@ def black_scholes_call(S, K, T, r, sigma):
     float
         Call option price
     """
-    # TODO: Implement Black-Scholes call option formula
-    # Hint: Use the formula from the Mathematical Background section
-    raise NotImplementedError("Implement Black-Scholes call option pricing")
+    # Calculate d1 and d2
+    d1 = (np.log(S / K) + (r + 0.5 * sigma**2) * T) / (sigma * np.sqrt(T))
+    d2 = d1 - sigma * np.sqrt(T)
+    
+    # Return Call Price: S * N(d1) - K * e^(-rT) * N(d2)
+    return S * norm.cdf(d1) - K * np.exp(-r * T) * norm.cdf(d2)
 
 
 def black_scholes_delta(S, K, T, r, sigma):
@@ -60,10 +63,11 @@ def black_scholes_delta(S, K, T, r, sigma):
     float
         Delta of the call option (between 0 and 1)
     """
-    # TODO: Implement Black-Scholes delta
-    # Hint: Calculate d1 first, then delta = Φ(d₁) = norm.cdf(d1)
-    # d1 = (ln(S/K) + (r + sigma²/2)*T) / (sigma * sqrt(T))
-    raise NotImplementedError("Implement Black-Scholes delta")
+    # Calculate d1
+    d1 = (np.log(S / K) + (r + 0.5 * sigma**2) * T) / (sigma * np.sqrt(T))
+    
+    # Return Delta: N(d1)
+    return norm.cdf(d1)
 
 
 class MertonModel:
@@ -107,9 +111,8 @@ class MertonModel:
         float
             Equity value
         """
-        # TODO: Implement equity valuation
-        # Hint: Use black_scholes_call with V as underlying, D as strike
-        raise NotImplementedError("Implement equity valuation")
+        # Equity is a call option on Assets (V) with strike Debt (D)
+        return black_scholes_call(V, D, self.T, r, sigma_V)
     
     def equity_volatility(self, V, D, r, sigma_V, E):
         """
@@ -133,8 +136,8 @@ class MertonModel:
         float
             Equity volatility
         """
-        # TODO: Implement equity volatility relationship
-        # Hint: Use black_scholes_delta and the relationship: sigma_E * E = delta * sigma_V * V
-        # where delta = ∂E/∂V = Φ(d₁) is the option delta
-        raise NotImplementedError("Implement equity volatility calculation")
-
+        # Calculate Delta (∂E/∂V)
+        delta = black_scholes_delta(V, D, self.T, r, sigma_V)
+        
+        # Formula: sigma_E = (V / E) * Delta * sigma_V
+        return (V / E) * delta * sigma_V
