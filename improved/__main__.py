@@ -1,65 +1,109 @@
 """
-Entry point for improved model.
+Entry point for improved Merton model.
 
 Run with: python -m improved
 """
 
 import sys
 import pandas as pd
+import numpy as np
 from pathlib import Path
 
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from improved.model import ImprovedModel
+from improved.model import MertonModel
 from improved.calibration import calibrate_asset_parameters
 from improved.risk_measures import compute_risk_measures
 
 
+def get_shares_outstanding():
+    return {
+        'AAPL': 17350.0,
+        'JPM': 3050.0,
+        'TSLA': 960.0,
+        'XOM': 4270.0,
+        'F': 3970.0
+    }
+
+
 def main():
-    """
-    Main entry point for improved model.
-    
-    This function should:
-    1. Load data (equity prices, equity vol, debt, risk-free rates)
-    2. For each firm and date, calibrate asset value and volatility using improved model
-    3. Compute risk measures (DD, PD) using improved model
-    4. Output results (print or save to file)
-    5. Optionally compare with baseline results
-    """
-    print("Improved Structural Credit Model")
+    print("IMPROVED Merton Model")
     print("=" * 60)
     
-    # TODO: Load data from data/real/ or data/synthetic/
-    # Example:
-    # equity_prices = pd.read_csv('data/real/equity_prices.csv', parse_dates=['date'])
-    # equity_vol = pd.read_csv('data/real/equity_vol.csv', parse_dates=['date'])
-    # debt = pd.read_csv('data/real/debt_quarterly.csv', parse_dates=['date'])
-    # risk_free = pd.read_csv('data/real/risk_free.csv', parse_dates=['date'])
+    data_dir = Path('data/real')
+    print(f"Loading data from {data_dir}...")
+
+    try:
+        equity_prices = pd.read_csv(data_dir / 'equity_prices.csv', parse_dates=['date'])
+        equity_vol = pd.read_csv(data_dir / 'equity_vol.csv', parse_dates=['date'])
+        debt = pd.read_csv(data_dir / 'debt_quarterly.csv', parse_dates=['date'])
+        risk_free = pd.read_csv(data_dir / 'risk_free.csv', parse_dates=['date'])
+    except Exception as e:
+        print(f"Error loading data: {e}")
+        return
+
+    equity_prices['year'] = equity_prices['date'].dt.year
+    debt['year'] = debt['date'].dt.year
+
+    df = pd.merge(equity_prices, equity_vol, on=['date', 'firm_id'], how='inner')
+    df = pd.merge(df, risk_free, on='date', how='left')
     
-    # TODO: For each firm and date:
-    # 1. Get equity value (E), equity volatility (sigma_E), debt (D), risk-free rate (r)
-    # 2. Set time to maturity (T, e.g., 1.0 year)
-    # 3. Calibrate using IMPROVED model: V, sigma_V = calibrate_asset_parameters(E, sigma_E, D, T, r)
-    # 4. Compute using IMPROVED model: DD, PD = compute_risk_measures(V, D, T, r, sigma_V)
-    # 5. Store results
+    debt_annual = debt[['firm_id', 'year', 'debt']].drop_duplicates()
+    df = pd.merge(df, debt_annual, on=['firm_id', 'year'], how='left')
     
-    # TODO: Output results
-    # Example:
-    # results_df = pd.DataFrame(results)
-    # results_df.to_csv('outputs/improved_results.csv', index=False)
-    # print("\nResults saved to outputs/improved_results.csv")
+    df = df.dropna(subset=['equity_price', 'equity_vol', 'debt', 'risk_free_rate'])
+
+    ## improve: Fix unit mismatch by calculating Market Cap (Price * Shares)
+    shares_map = get_shares_outstanding()
+    df['shares'] = df['firm_id'].map(shares_map)
+    df['market_equity'] = df['equity_price'] * df['shares']
     
-    # TODO: Compare with baseline (optional but recommended)
-    # baseline_results = pd.read_csv('outputs/baseline_results.csv')
-    # improved_results = pd.read_csv('outputs/improved_results.csv')
-    # ... perform comparison ...
+    df = df.dropna(subset=['market_equity'])
+
+    print(f"Processing {len(df)} records...")
     
-    print("\nTODO: Implement the main function")
-    print("See improved/model.py, improved/calibration.py, improved/risk_measures.py")
-    print("\nIMPORTANT: Document your improvement in the code and README!")
+    results = []
+    T = 1.0
+    
+    for row in df.itertuples():
+        ## improve: Use market_equity instead of share price
+        E = row.market_equity 
+        sigma_E = row.equity_vol
+        D = row.debt
+        r = row.risk_free_rate
+        
+        V, sigma_V = calibrate_asset_parameters(E, sigma_E, D, T, r)
+        
+        if np.isnan(V):
+            continue
+            
+        risk = compute_risk_measures(V, D, T, r, sigma_V)
+        
+        results.append({
+            'date': row.date,
+            'firm_id': row.firm_id,
+            'share_price': row.equity_price,
+            'market_cap': E,
+            'V': V,
+            'sigma_V': sigma_V,
+            'DD': risk['DD'],
+            'PD': risk['PD']
+        })
+    
+    output_dir = Path('outputs')
+    output_dir.mkdir(exist_ok=True)
+    
+    results_df = pd.DataFrame(results)
+    output_file = output_dir / 'improved_results.csv'
+    results_df.to_csv(output_file, index=False)
+    
+    print(f"\nResults saved to {output_file}")
+    
+    if not results_df.empty:
+        print("\nAverage PD by Firm (Improved):")
+        print(results_df.groupby('firm_id')['PD'].mean())
 
 
 if __name__ == "__main__":
     main()
-
