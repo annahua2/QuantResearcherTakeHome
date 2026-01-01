@@ -33,13 +33,18 @@ def distance_to_default(V, D, T, r, sigma_V):
     float
         Distance-to-default
     """
-    # TODO: Implement distance-to-default calculation
-    # Hint: See Mathematical Background section in README.md
     # DD = (E[V_T] - D) / std(V_T)
-    # where E[V_T] = V * exp(r*T)
-    # and std(V_T) = V * exp(r*T) * sqrt(exp(sigma_V^2*T) - 1)
+    # E[V_T] = V * exp(r*T)
+    # std(V_T) = V * exp(r*T) * sqrt(exp(sigma_V^2*T) - 1)
     
-    raise NotImplementedError("Implement distance-to-default calculation")
+    expected_asset_value = V * np.exp(r * T)
+    std_asset_value = expected_asset_value * np.sqrt(np.exp(sigma_V**2 * T) - 1)
+    
+    # Avoid division by zero
+    if std_asset_value < 1e-8:
+        return np.inf if expected_asset_value > D else -np.inf
+        
+    return (expected_asset_value - D) / std_asset_value
 
 
 def default_probability(V, D, T, r, sigma_V):
@@ -66,11 +71,14 @@ def default_probability(V, D, T, r, sigma_V):
     float
         Default probability (between 0 and 1)
     """
-    # TODO: Implement default probability calculation
-    # Hint: See Mathematical Background section in README.md
     # PD = Phi(-d2) where d2 = (ln(V/D) + (r - sigma_V^2/2)*T) / (sigma_V*sqrt(T))
     
-    raise NotImplementedError("Implement default probability calculation")
+    numerator = np.log(V / D) + (r - 0.5 * sigma_V**2) * T
+    denominator = sigma_V * np.sqrt(T)
+    
+    d2 = numerator / denominator
+    
+    return norm.cdf(-d2)
 
 
 def compute_risk_measures(V, D, T, r, sigma_V):
@@ -102,4 +110,3 @@ def compute_risk_measures(V, D, T, r, sigma_V):
         'DD': DD,
         'PD': PD
     }
-
