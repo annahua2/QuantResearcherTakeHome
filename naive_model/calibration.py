@@ -43,18 +43,15 @@ def calibrate_asset_parameters(E, sigma_E, D, T, r, V0=None, sigma_V0=None):
     tuple (V, sigma_V)
         Estimated asset value and asset volatility
     """
-    # TODO: Implement calibration
-    # Hint: Use scipy.optimize.fsolve to solve the system of equations
     
     if V0 is None:
-        V0 = E + D  # Simple initial guess
+        V0 = E + D 
     if sigma_V0 is None:
         sigma_V0 = sigma_E * E / (E + D) if (E + D) > 0 else sigma_E
     
     def equations(params):
         """
         System of equations to solve.
-        
         Returns:
         --------
         list [eq1, eq2]
@@ -62,22 +59,29 @@ def calibrate_asset_parameters(E, sigma_E, D, T, r, V0=None, sigma_V0=None):
         """
         V, sigma_V = params
         
-        # TODO: Equation 1: Equity value equals call option value
-        # E_calc = black_scholes_call(V, D, T, r, sigma_V)
-        # eq1 = E_calc - E
+        # Enforce positive values for numerical stability
+        V = np.abs(V)
+        sigma_V = np.abs(sigma_V)
         
-        # TODO: Equation 2: Equity volatility relationship
-        # delta = black_scholes_delta(V, D, T, r, sigma_V)
-        # E_vol_calc = (delta * sigma_V * V) / E if E > 0 else 0
-        # eq2 = E_vol_calc - sigma_E
+        # Equation 1: Equity value equals call option value
+        E_calc = black_scholes_call(V, D, T, r, sigma_V)
+        eq1 = E_calc - E
         
-        # return [eq1, eq2]
-        raise NotImplementedError("Implement calibration equations")
+        # Equation 2: Equity volatility relationship
+        delta = black_scholes_delta(V, D, T, r, sigma_V)
+        
+        # Avoid division by zero
+        if E > 1e-8:
+            E_vol_calc = (V / E) * delta * sigma_V
+        else:
+            E_vol_calc = sigma_V
+            
+        eq2 = E_vol_calc - sigma_E
+        
+        return [eq1, eq2]
     
-    # TODO: Solve the system
-    # result = fsolve(equations, [V0, sigma_V0], xtol=1e-6)
-    # V, sigma_V = result
-    # return V, sigma_V
+    # Solve the system
+    result = fsolve(equations, [V0, sigma_V0], xtol=1e-6)
+    V, sigma_V = result
     
-    raise NotImplementedError("Implement calibration solver")
-
+    return np.abs(V), np.abs(sigma_V)
