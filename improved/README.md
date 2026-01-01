@@ -1,37 +1,27 @@
-# Improved Model Implementation
+# Improved Merton Model
 
-This directory is for your improved structural credit model.
+This directory contains the improved structural credit model, designed to fix a critical logical error in the baseline implementation.
 
-## Getting Started
+## Documentation of Improvement
 
-1. **Copy the baseline implementation**:
-   ```bash
-   cp -r ../naive_model/* .
-   ```
+* **Assumption Modified:**
+    I changed the input for Equity Value ($E$) from **Share Price** to **Market Capitalization**. The baseline model incorrectly used the price of a single share (e.g., ~$100) as the total equity value of the firm.
 
-2. **Modify the code** to implement your improvement:
-   - Update `model.py` with your improved model
-   - Update `calibration.py` for the new calibration approach
-   - Update `risk_measures.py` for improved risk calculations
-   - Update `__main__.py` to run your improved model
+* **Justification:**
+    This change corrects a fundamental **Unit Mismatch**. The Merton model relies on the identity $V = E + D$. Since the provided Debt data ($D$) is reported as the *Total Debt* (in millions), it is mathematically invalid to add a *per-share* price to it. To make the equation valid, both Equity and Debt must represent firm-wide totals.
 
-3. **Document your improvement**:
-   - What assumption did you modify?
-   - Why is this improvement justified?
-   - How does it address a weakness in the baseline model?
+* **Addressing the Weakness:**
+    The baseline model produced nonsensical results (e.g., 100% default probability for Apple) because it treated companies as having almost zero equity compared to their debt. By using Market Cap ($Price \times Shares$), the improved model correctly accounts for the firm's actual equity cushion, resulting in realistic Default Probabilities (near 0% for healthy firms).
 
-4. **Test your implementation**:
-   ```bash
-   python -m improved
-   ```
+## Implementation Details
 
-## Example Improvements
+The dataset lacked "Shares Outstanding" data, so I implemented a specific fix in `__main__.py`:
 
-- **First-passage time**: Allow default before maturity
-- **Stochastic volatility**: Model volatility as a random process
-- **Mean-reverting assets**: Use Ornstein-Uhlenbeck process
-- **Different default barrier**: Use a barrier that changes over time
-- **Jump diffusion**: Add jumps to the asset process
+1.  Created a `get_shares_outstanding()` function with approximate 2020 share counts for the 5 firms.
+2.  Calculated `market_equity = equity_price * shares` to derive the correct total equity value before calibration.
 
-Remember: Keep it simple! The improvement should be minimal and well-justified.
+## How to Run
+
+```bash
+python -m improved
 
